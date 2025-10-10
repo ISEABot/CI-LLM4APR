@@ -38,157 +38,83 @@ fetch:
 
 topics:
 
-  # === Ⅰ. LLMs for Code ===
   - name: "LLMsForCode"
     label: "LLMs for Code"
     query:
-      categories: ["cs.SE", "cs.AI", "cs.CL", "cs.LG"]
-      include: [
-        "large language model",
-        "code language model",
-        "code representation",
-        "code completion",
-        "code understanding",
-        "code translation",
-        "code summarization"
-      ]
-      exclude: ["quantum", "biomedical", "vision"]
-    interest_prompt: |
-      I am interested in the foundation of large language models for code,
-      including their architectures (encoder-only, encoder-decoder, decoder-only),
-      pretraining objectives, and downstream code tasks such as completion,
-      translation, summarization, and defect detection.
-
-  # === Ⅱ. SE with LLMs: Requirement & Design ===
-  - name: "RequirementDesign"
-    label: "Requirement and Design"
-    query:
-      categories: ["cs.SE", "cs.AI"]
-      include: [
-        "software requirements",
-        "requirements engineering",
-        "system design",
-        "software architecture",
-        "design pattern",
-        "uml generation",
-        "requirement analysis",
-        "design synthesis"
-      ]
+      categories: ["cs.SE", "cs.AI", "cs.CL"]
+      include: ["code language model", "code generation", "code understanding", "pretraining for code"]
       exclude: ["quantum", "biomedical"]
     interest_prompt: |
-      I am interested in how LLMs assist early-stage software engineering tasks,
-      including requirement understanding, system design, and architecture synthesis.
-      I aim to explore how natural language and code reasoning can be combined
-      to bridge requirement and design stages.
+      I am interested in large language models that are specifically trained or adapted for code.
+      This includes understanding how different architectures (encoder-only, decoder-only, and encoder-decoder)
+      and pretraining objectives (masked modeling, autoregressive generation, contrastive learning, etc.)
+      affect the ability to represent and reason about program semantics.
+      I want to study how such code-specific LLMs perform on fundamental tasks like
+      code completion, summarization, translation, and bug repair, and how pretraining data
+      and tokenization strategies influence downstream effectiveness and generalization.
 
-  # === Ⅲ. SE with LLMs: Software Development ===
-  - name: "SoftwareDevelopment"
-    label: "Software Development"
+  - name: "RequirementsAndDesign"
+    label: "Requirements & Design"
     query:
       categories: ["cs.SE", "cs.AI"]
-      include: [
-        "code generation",
-        "code completion",
-        "code review",
-        "documentation generation",
-        "refactoring",
-        "api recommendation",
-        "pair programming",
-        "IDE assistant"
-      ]
+      include: ["requirements engineering", "software design", "architecture generation"]
       exclude: ["quantum", "biomedical"]
     interest_prompt: |
-      I focus on LLM-based code generation and developer assistance.
-      I want to understand how LLMs integrate into development environments,
-      support refactoring, code review, and documentation, and improve programming productivity.
+      I am focused on how LLMs can assist in the early stages of the software engineering lifecycle,
+      including requirement elicitation, natural language specification analysis, and software design synthesis.
+      I aim to explore how natural language inputs can be transformed into structured representations
+      such as UML models, architecture diagrams, or design patterns, leveraging LLMs’ ability to interpret,
+      abstract, and align human intent with system-level design artifacts.
+      I am also interested in evaluating the reliability and traceability of LLM-generated designs
+      and their integration into model-driven engineering workflows.
 
-  # === Ⅳ. SE with LLMs: Software Testing ===
-  - name: "SoftwareTesting"
-    label: "Software Testing"
+  - name: "DevelopmentAndTesting"
+    label: "Development & Testing"
     query:
       categories: ["cs.SE", "cs.AI"]
-      include: [
-        "software testing",
-        "test case generation",
-        "assertion generation",
-        "test repair",
-        "test update",
-        "test evolution",
-        "mutation testing",
-        "test coverage",
-        "automated testing"
-      ]
+      include: ["code generation", "test generation", "assertion generation", "bug fixing"]
       exclude: ["quantum", "biomedical"]
     interest_prompt: |
-      I am interested in test generation, repair, and evolution using LLMs.
-      I want to study how static analysis, retrieval, and reasoning mechanisms
-      can enhance the accuracy, coverage, and maintainability of automatically
-      generated tests.
+      I am studying how LLMs can automate key development and testing tasks,
+      such as code generation, assertion inference, and bug repair.
+      My focus is on combining LLM-based reasoning with static and dynamic analysis
+      to improve correctness, readability, and maintainability of generated artifacts.
+      I also aim to understand how retrieval-augmented generation, context enrichment,
+      and prompt engineering techniques enhance LLM performance in test case generation and evaluation.
+      Additionally, I am interested in methods for validating and debugging LLM-generated tests
+      to ensure executable quality and consistent test coverage in large-scale projects.
 
-  # === Ⅴ. SE with LLMs: Software Maintenance ===
-  - name: "SoftwareMaintenance"
-    label: "Software Maintenance"
+  - name: "MaintenanceAndEvolution"
+    label: "Maintenance & Evolution"
     query:
       categories: ["cs.SE", "cs.AI"]
-      include: [
-        "program repair",
-        "bug fixing",
-        "defect localization",
-        "code smell detection",
-        "software evolution",
-        "patch generation",
-        "code migration"
-      ]
+      include: ["software maintenance", "program repair", "refactoring", "test evolution"]
       exclude: ["quantum", "biomedical"]
     interest_prompt: |
-      I am interested in leveraging LLMs for software maintenance and evolution,
-      including automatic bug fixing, refactoring, and patch generation.
-      I focus on how LLMs can reason about code history, version differences,
-      and semantic changes to improve repair quality.
+      I am interested in leveraging LLMs to support software maintenance and evolution tasks,
+      such as automated program repair, refactoring, and regression test update.
+      My research explores hybrid approaches that integrate LLMs with change analysis,
+      version differencing, and semantic dependency tracking to maintain code consistency
+      during project evolution.
+      I also want to investigate how LLMs understand edit intent, refactor patterns,
+      and project history, enabling intelligent test evolution and adaptive code transformations
+      in continuously changing software repositories.
 
-  # === Ⅵ. SE with LLMs: Software Management ===
-  - name: "SoftwareManagement"
-    label: "Software Management"
+  - name: "EvaluationAndOptimization"
+    label: "Evaluation & Optimization"
     query:
       categories: ["cs.SE", "cs.AI"]
-      include: [
-        "project management",
-        "issue tracking",
-        "developer productivity",
-        "code review process",
-        "software documentation",
-        "traceability",
-        "knowledge management"
-      ]
+      include: ["benchmark", "evaluation", "fine-tuning", "distillation", "model optimization"]
       exclude: ["quantum", "biomedical"]
     interest_prompt: |
-      I am interested in the use of LLMs for project and knowledge management,
-      including issue triage, documentation generation, and developer support tools.
-      I focus on enabling intelligent coordination and maintenance workflows.
-
-  # === Ⅶ. Integration and Evaluation Dimensions ===
-  - name: "IntegrationEvaluation"
-    label: "Integration and Evaluation"
-    query:
-      categories: ["cs.SE", "cs.AI"]
-      include: [
-        "evaluation benchmark",
-        "model tuning",
-        "instruction tuning",
-        "parameter efficient tuning",
-        "model compression",
-        "knowledge distillation",
-        "empirical study",
-        "education",
-        "safety",
-        "reliability",
-        "hallucination mitigation"
-      ]
-      exclude: ["quantum", "biomedical"]
-    interest_prompt: |
-      I am interested in the evaluation and integration aspects of LLMs for software engineering.
-      This includes benchmark design, fine-tuning, compression, safety, reliability,
-      and empirical studies that assess model performance and trustworthiness.
+      I am focused on the evaluation and optimization of LLMs for software engineering tasks.
+      This includes designing benchmarks, metrics, and evaluation protocols that measure
+      correctness, robustness, and executability of LLM-generated code or tests.
+      I also study how fine-tuning, instruction tuning, and model distillation
+      can adapt general-purpose LLMs to SE-specific domains with efficiency and stability.
+      My goal is to understand the trade-offs between performance and cost,
+      and to identify methods that improve model generalization, reduce hallucination,
+      and preserve domain knowledge in resource-constrained environments.
 
   - name: "LLM4APR"
     label: "LLM4APR"
@@ -253,7 +179,7 @@ email:
   sender: "${MAIL_USERNAME}"
 
   # ✅ Recipient list
-  recipients: ["syeren@foxmail.com"]
+  recipients: ["syeren@foxmail.com", "quanjunzhang@njust.edu.cn"]
 
   # ✅ SMTP server settings (recommend injecting sensitive info via environment variables)
   smtp_host: "smtp.gmail.com"
