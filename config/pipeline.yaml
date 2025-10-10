@@ -28,7 +28,7 @@ openai:
 
 fetch:
   # ✅ Max papers to fetch per Topic, used to control costs
-  max_papers_per_topic: 100
+  max_papers_per_topic: 30
 
   # ✅ Query lookback days: e.g., 7 means fetch papers published within last 7 days
   days_back: 7
@@ -222,7 +222,7 @@ site:
   output_dir: "site"
 
   # ✅ External access base URL, update to actual address after GitHub Pages publishing
-  base_url: "https://yeren66.github.io/LLM4ArxivPaper"
+  base_url: "https://iseabot.github.io/LLM4ArxivPaper"
 
 email:
   # ✅ Whether to enable email push (false = disabled)
@@ -244,7 +244,7 @@ email:
   timeout: 30
 
   # ✅ Email subject template, can use {run_date}, {paper_count} placeholders
-  subject_template: "📑 Weekly Paper Reading - {run_date}"
+  subject_template: "📑 Weekly LLM4SE Paper Reading - {run_date}"
 
 runtime:
   # ✅ Run mode:
