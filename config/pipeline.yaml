@@ -190,6 +190,27 @@ topics:
       This includes benchmark design, fine-tuning, compression, safety, reliability,
       and empirical studies that assess model performance and trustworthiness.
 
+  - name: "LLM4APR"
+    label: "LLM4APR"
+    query:
+      categories: ["cs.SE", "cs.AI"]
+      include: [
+        "program repair",
+        "automated program repair",
+        "patch generation",
+        "bug repair",
+        "LLM repair",
+        "patch correctness",
+        "repair benchmark"
+      ]
+      exclude: ["quantum", "biomedical"]
+    interest_prompt: |
+      I am interested in how large language models are used for automatic program repair.
+      Specifically, I want to explore how LLMs can generate patches, localize bugs, and
+      evaluate patch correctness. I am also interested in repair across different bug types
+      (semantic, syntax, vulnerability), patch validation, and interaction with static / dynamic
+      analysis to improve reliability of repair.
+
       
 relevance:
   # ✅ Dimension definitions for paper relevance, can add/remove/adjust weights based on interests
