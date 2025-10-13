@@ -35,6 +35,7 @@ jobs:
 
       - name: Run pipeline (test mode)
         env:
+        GH_TOKEN: ${{ secrets.GH_TOKEN }}
           BASE_URL: ${{ secrets.BASE_URL }}
           API_KEY: ${{ secrets.API_KEY }}
           MAIL_USERNAME: ${{ secrets.MAIL_USERNAME }}
