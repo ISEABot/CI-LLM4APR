@@ -22,9 +22,11 @@ from fetchers.arxiv_client import ArxivClient
 from filters.relevance_ranker import RelevanceRanker
 from publisher.email_digest import EmailDigest
 from publisher.static_site import StaticSiteBuilder
+from publisher.github_committer import GitHubCommitter, GitHubConfig, PaperMetadata
 from summaries.report_builder import ReportBuilder
 from summaries.task_planner import TaskPlanner
 from summaries.task_reader import TaskReader
+from summaries.metadata_extractor import MetadataExtractor
 
 
 @dataclass
@@ -51,11 +53,31 @@ def run_pipeline(config_path: str, overrides: Optional[PipelineOverrides] = None
 	planner = TaskPlanner(config.openai, config.summarization, mode=config.runtime.mode)
 	reader = TaskReader(parser, config.openai, config.summarization, mode=config.runtime.mode)
 	report_builder = ReportBuilder(config.summarization)
+	metadata_extractor = MetadataExtractor(config.openai, mode=config.runtime.mode)
+	
+	# GitHub committer (optional, only if enabled)
+	github_committer = None
+	if config.github.enabled and config.github.token and config.github.repo_name:
+		try:
+			gh_config = GitHubConfig(
+				token=config.github.token,
+				repo_name=config.github.repo_name,
+				branch=config.github.branch,
+				file_path=config.github.file_path,
+			)
+			github_committer = GitHubCommitter(gh_config)
+			print(f"[INFO] GitHub integration enabled for repo: {config.github.repo_name}")
+		except Exception as e:
+			print(f"[WARN] Failed to initialize GitHub committer: {e}")
+			github_committer = None
+	
+	# Keep these for backward compatibility but they won't be used if GitHub is enabled
 	site_builder = StaticSiteBuilder(config.site)
 	email_digest = EmailDigest(config.email, config.site.base_url)
 
 	start_time = datetime.utcnow()
 	summaries: List[PaperSummary] = []
+	paper_metadata_list: List[PaperMetadata] = []  # For GitHub commit
 	total_fetched = 0
 	total_selected = 0
 
@@ -93,11 +115,18 @@ def run_pipeline(config_path: str, overrides: Optional[PipelineOverrides] = None
 				f"[INFO] Topic {topic.label}: processing paper {paper_index}/{len(selected)} "
 				f"[{scored_paper.paper.arxiv_id}] {scored_paper.paper.title} — score {normalised_score:.1f}"
 			)
-			# New workflow: pass interest_prompt instead of pre-built tasks
+			
+			# Simplified workflow: only extract metadata, no deep analysis
 			core_summary, tasks, findings, overview, brief_summary, _ = reader.analyse(
 				scored_paper.paper, 
 				topic.interest_prompt
 			)
+			
+			# Extract publication venue using LLM
+			published_date, venue = metadata_extractor.extract_venue(scored_paper.paper)
+			print(f"[INFO] Extracted venue: {venue}, published: {published_date}")
+			
+			# Build simplified summary (for logging/debugging)
 			summary = report_builder.build(
 				topic=topic,
 				scored_paper=scored_paper,
@@ -106,21 +135,49 @@ def run_pipeline(config_path: str, overrides: Optional[PipelineOverrides] = None
 				findings=findings,
 				overview=overview,
 				brief_summary=brief_summary,
+				venue=venue,
 			)
 			summaries.append(summary)
+			
+			# Collect metadata for GitHub commit
+			paper_metadata = PaperMetadata(
+				title=scored_paper.paper.title,
+				published_date=published_date,
+				venue=venue,
+				arxiv_id=scored_paper.paper.arxiv_id,
+				arxiv_url=scored_paper.paper.arxiv_url,
+			)
+			paper_metadata_list.append(paper_metadata)
+			
 			print(
-				f"[INFO] Topic {topic.label}: completed summary for {scored_paper.paper.arxiv_id}, total summaries {len(summaries)}"
+				f"[INFO] Topic {topic.label}: completed processing for {scored_paper.paper.arxiv_id}, total papers {len(summaries)}"
 			)
 
+	# Always generate static site for detailed paper analysis
 	os.environ["PIPELINE_RUN_AT"] = datetime.utcnow().isoformat()
 	site_builder.build(summaries)
 	print(f"[INFO] Static site written to '{config.site.output_dir}'.")
 
-	subject_context = {
-		"run_date": datetime.utcnow().strftime("%Y-%m-%d"),
-		"paper_count": len(summaries),
-	}
-	email_digest.send(summaries, subject_context)
+	# Commit to GitHub if enabled (for quick paper tracking table)
+	if github_committer and paper_metadata_list:
+		print(f"[INFO] Committing {len(paper_metadata_list)} papers to GitHub...")
+		commit_message = f"Update papers - {datetime.utcnow().strftime('%Y-%m-%d')} (added {len(paper_metadata_list)} papers)"
+		success = github_committer.commit_papers(paper_metadata_list, commit_message)
+		if success:
+			print(f"[INFO] Successfully committed papers to GitHub repository {config.github.repo_name}")
+		else:
+			print(f"[WARN] Failed to commit papers to GitHub")
+	elif config.github.enabled:
+		print("[INFO] GitHub integration enabled but no papers to commit or not properly configured.")
+
+	# Send email digest if enabled
+	if config.email.enabled:
+		subject_context = {
+			"run_date": datetime.utcnow().strftime("%Y-%m-%d"),
+			"paper_count": len(summaries),
+		}
+		email_digest.send(summaries, subject_context)
+		print(f"[INFO] Email digest sent to {len(config.email.recipients)} recipients.")
 
 	end_time = datetime.utcnow()
 	stats = PipelineStats(
@@ -160,8 +217,8 @@ def _build_offline_demo_candidate(topic: TopicConfig) -> PaperCandidate:
 		arxiv_id=f"demo-{topic.name}-{now.strftime('%H%M%S')}",
 		title=f"[Demo] {topic.label} Automated Test Example",
 		abstract=abstract,
-		authors=["LLM4ArxivPaper Bot"],
-		affiliations=["LLM4ArxivPaper Project"],
+		authors=["CI-LLM4APR Bot"],
+		affiliations=["CI-LLM4APR Project"],
 		categories=categories,
 		published=now,
 		updated=now,

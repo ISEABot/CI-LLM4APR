@@ -92,14 +92,14 @@ class EmailDigest:
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>LLM4ArxivPaper Weekly Digest</title>
+  <title>CI-LLM4APR Weekly Digest</title>
 </head>
 <body style="margin:0;padding:0;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Helvetica Neue',Arial,sans-serif;background-color:#f5f5f5;color:#333;">
   <div style="max-width:700px;margin:0 auto;background-color:#ffffff;">
     
     <!-- Header Banner -->
     <div style="background:linear-gradient(135deg,#2563eb 0%,#1d4ed8 100%);padding:40px 30px;text-align:center;color:#ffffff;">
-      <h1 style="margin:0 0 10px;font-size:28px;font-weight:700;">📚 LLM4ArxivPaper</h1>
+      <h1 style="margin:0 0 10px;font-size:28px;font-weight:700;">📚 CI-LLM4APR</h1>
       <p style="margin:0;font-size:16px;opacity:0.95;">Weekly Curated Research Papers</p>
     </div>
     
@@ -226,7 +226,7 @@ class EmailDigest:
         <span style="font-size:24px;">📚</span>
       </div>
       <div style="font-size:14px;color:#6b7280;margin-bottom:10px;">
-        <strong>LLM4ArxivPaper</strong> - Intelligent Paper Reading Assistant
+        <strong>CI-LLM4APR</strong> - Intelligent Paper Reading Assistant
       </div>
 """
 		

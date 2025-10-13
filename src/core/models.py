@@ -1,4 +1,4 @@
-"""Core datamodels used across the LLM4ArxivPaper pipeline."""
+"""Core datamodels used across the CI-LLM4APR pipeline."""
 
 from __future__ import annotations
 
@@ -91,6 +91,16 @@ class EmailConfig:
 
 
 @dataclass
+class GitHubConfig:
+	"""Configuration for GitHub repository integration."""
+	enabled: bool = False
+	token: Optional[str] = None
+	repo_name: Optional[str] = None
+	branch: str = "updates"
+	file_path: str = "update.md"
+
+
+@dataclass
 class RuntimeConfig:
 	mode: str = "offline"
 	paper_limit: Optional[int] = None
@@ -105,6 +115,7 @@ class PipelineConfig:
 	summarization: SummarizationConfig
 	site: SiteConfig
 	email: EmailConfig
+	github: GitHubConfig
 	runtime: RuntimeConfig
 
 	@staticmethod
@@ -138,6 +149,7 @@ class PipelineConfig:
 		summarization_section = payload.get("summarization", {})
 		site_section = payload.get("site", {})
 		email_section = payload.get("email", {})
+		github_section = payload.get("github", {})
 		runtime_section = payload.get("runtime", {})
 
 		return PipelineConfig(
@@ -179,6 +191,13 @@ class PipelineConfig:
 				use_tls=bool(email_section.get("use_tls", True)),
 				use_ssl=bool(email_section.get("use_ssl", False)),
 				timeout=int(email_section.get("timeout", 30)),
+			),
+			github=GitHubConfig(
+				enabled=bool(github_section.get("enabled", False)),
+				token=github_section.get("token"),
+				repo_name=github_section.get("repo_name"),
+				branch=github_section.get("branch", "updates"),
+				file_path=github_section.get("file_path", "update.md"),
 			),
 			runtime=RuntimeConfig(
 				mode=runtime_section.get("mode", "offline"),

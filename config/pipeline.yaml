@@ -1,5 +1,5 @@
 # =============================
-# LLM4ArxivPaper Main Configuration Template
+# CI-LLM4APR Main Configuration Template
 #
 # Notes:
 # 1. All fields can be adjusted as needed; delete unused array configurations if not required.
@@ -15,7 +15,7 @@ openai:
   base_url: "${BASE_URL}"
 
   # ✅ Model for relevance scoring (recommended to use lightweight model, e.g. gpt-4o-mini)
-  relevance_model: "gpt-4o-mini"
+  relevance_model: "gpt-4o"
 
   # ✅ Model for TODO planning and item-by-item Q&A (can be same as above or use stronger model)
   summarization_model: "gpt-4o"
@@ -28,7 +28,7 @@ openai:
 
 fetch:
   # ✅ Max papers to fetch per Topic, used to control costs
-  max_papers_per_topic: 30
+  max_papers_per_topic: 50
 
   # ✅ Query lookback days: e.g., 7 means fetch papers published within last 7 days
   days_back: 7
@@ -38,83 +38,83 @@ fetch:
 
 topics:
 
-  - name: "LLMsForCode"
-    label: "LLMs for Code"
-    query:
-      categories: ["cs.SE", "cs.AI", "cs.CL"]
-      include: ["code language model", "code generation", "code understanding", "pretraining for code"]
-      exclude: ["quantum", "biomedical"]
-    interest_prompt: |
-      I am interested in large language models that are specifically trained or adapted for code.
-      This includes understanding how different architectures (encoder-only, decoder-only, and encoder-decoder)
-      and pretraining objectives (masked modeling, autoregressive generation, contrastive learning, etc.)
-      affect the ability to represent and reason about program semantics.
-      I want to study how such code-specific LLMs perform on fundamental tasks like
-      code completion, summarization, translation, and bug repair, and how pretraining data
-      and tokenization strategies influence downstream effectiveness and generalization.
+  # - name: "LLMsForCode"
+  #   label: "LLMs for Code"
+  #   query:
+  #     categories: ["cs.SE", "cs.AI", "cs.CL"]
+  #     include: ["code language model", "code generation", "code understanding", "pretraining for code"]
+  #     exclude: ["quantum", "biomedical"]
+  #   interest_prompt: |
+  #     I am interested in large language models that are specifically trained or adapted for code.
+  #     This includes understanding how different architectures (encoder-only, decoder-only, and encoder-decoder)
+  #     and pretraining objectives (masked modeling, autoregressive generation, contrastive learning, etc.)
+  #     affect the ability to represent and reason about program semantics.
+  #     I want to study how such code-specific LLMs perform on fundamental tasks like
+  #     code completion, summarization, translation, and bug repair, and how pretraining data
+  #     and tokenization strategies influence downstream effectiveness and generalization.
 
-  - name: "RequirementsAndDesign"
-    label: "Requirements & Design"
-    query:
-      categories: ["cs.SE", "cs.AI"]
-      include: ["requirements engineering", "software design", "architecture generation"]
-      exclude: ["quantum", "biomedical"]
-    interest_prompt: |
-      I am focused on how LLMs can assist in the early stages of the software engineering lifecycle,
-      including requirement elicitation, natural language specification analysis, and software design synthesis.
-      I aim to explore how natural language inputs can be transformed into structured representations
-      such as UML models, architecture diagrams, or design patterns, leveraging LLMs’ ability to interpret,
-      abstract, and align human intent with system-level design artifacts.
-      I am also interested in evaluating the reliability and traceability of LLM-generated designs
-      and their integration into model-driven engineering workflows.
+  # - name: "RequirementsAndDesign"
+  #   label: "Requirements & Design"
+  #   query:
+  #     categories: ["cs.SE", "cs.AI"]
+  #     include: ["requirements engineering", "software design", "architecture generation"]
+  #     exclude: ["quantum", "biomedical"]
+  #   interest_prompt: |
+  #     I am focused on how LLMs can assist in the early stages of the software engineering lifecycle,
+  #     including requirement elicitation, natural language specification analysis, and software design synthesis.
+  #     I aim to explore how natural language inputs can be transformed into structured representations
+  #     such as UML models, architecture diagrams, or design patterns, leveraging LLMs’ ability to interpret,
+  #     abstract, and align human intent with system-level design artifacts.
+  #     I am also interested in evaluating the reliability and traceability of LLM-generated designs
+  #     and their integration into model-driven engineering workflows.
 
-  - name: "DevelopmentAndTesting"
-    label: "Development & Testing"
-    query:
-      categories: ["cs.SE", "cs.AI"]
-      include: ["code generation", "test generation", "assertion generation", "bug fixing"]
-      exclude: ["quantum", "biomedical"]
-    interest_prompt: |
-      I am studying how LLMs can automate key development and testing tasks,
-      such as code generation, assertion inference, and bug repair.
-      My focus is on combining LLM-based reasoning with static and dynamic analysis
-      to improve correctness, readability, and maintainability of generated artifacts.
-      I also aim to understand how retrieval-augmented generation, context enrichment,
-      and prompt engineering techniques enhance LLM performance in test case generation and evaluation.
-      Additionally, I am interested in methods for validating and debugging LLM-generated tests
-      to ensure executable quality and consistent test coverage in large-scale projects.
+  # - name: "DevelopmentAndTesting"
+  #   label: "Development & Testing"
+  #   query:
+  #     categories: ["cs.SE", "cs.AI"]
+  #     include: ["code generation", "test generation", "assertion generation", "bug fixing"]
+  #     exclude: ["quantum", "biomedical"]
+  #   interest_prompt: |
+  #     I am studying how LLMs can automate key development and testing tasks,
+  #     such as code generation, assertion inference, and bug repair.
+  #     My focus is on combining LLM-based reasoning with static and dynamic analysis
+  #     to improve correctness, readability, and maintainability of generated artifacts.
+  #     I also aim to understand how retrieval-augmented generation, context enrichment,
+  #     and prompt engineering techniques enhance LLM performance in test case generation and evaluation.
+  #     Additionally, I am interested in methods for validating and debugging LLM-generated tests
+  #     to ensure executable quality and consistent test coverage in large-scale projects.
 
-  - name: "MaintenanceAndEvolution"
-    label: "Maintenance & Evolution"
-    query:
-      categories: ["cs.SE", "cs.AI"]
-      include: ["software maintenance", "program repair", "refactoring", "test evolution"]
-      exclude: ["quantum", "biomedical"]
-    interest_prompt: |
-      I am interested in leveraging LLMs to support software maintenance and evolution tasks,
-      such as automated program repair, refactoring, and regression test update.
-      My research explores hybrid approaches that integrate LLMs with change analysis,
-      version differencing, and semantic dependency tracking to maintain code consistency
-      during project evolution.
-      I also want to investigate how LLMs understand edit intent, refactor patterns,
-      and project history, enabling intelligent test evolution and adaptive code transformations
-      in continuously changing software repositories.
+  # - name: "MaintenanceAndEvolution"
+  #   label: "Maintenance & Evolution"
+  #   query:
+  #     categories: ["cs.SE", "cs.AI"]
+  #     include: ["software maintenance", "program repair", "refactoring", "test evolution"]
+  #     exclude: ["quantum", "biomedical"]
+  #   interest_prompt: |
+  #     I am interested in leveraging LLMs to support software maintenance and evolution tasks,
+  #     such as automated program repair, refactoring, and regression test update.
+  #     My research explores hybrid approaches that integrate LLMs with change analysis,
+  #     version differencing, and semantic dependency tracking to maintain code consistency
+  #     during project evolution.
+  #     I also want to investigate how LLMs understand edit intent, refactor patterns,
+  #     and project history, enabling intelligent test evolution and adaptive code transformations
+  #     in continuously changing software repositories.
 
-  - name: "EvaluationAndOptimization"
-    label: "Evaluation & Optimization"
-    query:
-      categories: ["cs.SE", "cs.AI"]
-      include: ["benchmark", "evaluation", "fine-tuning", "distillation", "model optimization"]
-      exclude: ["quantum", "biomedical"]
-    interest_prompt: |
-      I am focused on the evaluation and optimization of LLMs for software engineering tasks.
-      This includes designing benchmarks, metrics, and evaluation protocols that measure
-      correctness, robustness, and executability of LLM-generated code or tests.
-      I also study how fine-tuning, instruction tuning, and model distillation
-      can adapt general-purpose LLMs to SE-specific domains with efficiency and stability.
-      My goal is to understand the trade-offs between performance and cost,
-      and to identify methods that improve model generalization, reduce hallucination,
-      and preserve domain knowledge in resource-constrained environments.
+  # - name: "EvaluationAndOptimization"
+  #   label: "Evaluation & Optimization"
+  #   query:
+  #     categories: ["cs.SE", "cs.AI"]
+  #     include: ["benchmark", "evaluation", "fine-tuning", "distillation", "model optimization"]
+  #     exclude: ["quantum", "biomedical"]
+  #   interest_prompt: |
+  #     I am focused on the evaluation and optimization of LLMs for software engineering tasks.
+  #     This includes designing benchmarks, metrics, and evaluation protocols that measure
+  #     correctness, robustness, and executability of LLM-generated code or tests.
+  #     I also study how fine-tuning, instruction tuning, and model distillation
+  #     can adapt general-purpose LLMs to SE-specific domains with efficiency and stability.
+  #     My goal is to understand the trade-offs between performance and cost,
+  #     and to identify methods that improve model generalization, reduce hallucination,
+  #     and preserve domain knowledge in resource-constrained environments.
 
   - name: "LLM4APR"
     label: "LLM4APR"
@@ -155,7 +155,7 @@ relevance:
       description: "Whether experiment/evaluation setup sufficiently answers key questions"
 
   # ✅ Pass threshold: total score >= this value considered "relevant", ultimately retained
-  pass_threshold: 60
+  pass_threshold: 20
 
 summarization:
   # ✅ Target number of TODO list items, actual generated count may vary slightly
@@ -169,17 +169,17 @@ site:
   output_dir: "site"
 
   # ✅ External access base URL, update to actual address after GitHub Pages publishing
-  base_url: "https://iseabot.github.io/LLM4ArxivPaper"
+  base_url: "https://iseabot.github.io/CI-LLM4APR"
 
 email:
-  # ✅ Whether to enable email push (false = disabled)
-  enabled: true
+  # ✅ Whether to enable email push (false = disabled, only used when GitHub integration is disabled)
+  enabled: false
 
   # ✅ Sender email (must support SMTP), recommend using app-specific password
   sender: "${MAIL_USERNAME}"
 
   # ✅ Recipient list
-  recipients: ["syeren@foxmail.com", "quanjunzhang@njust.edu.cn"]
+  recipients: ["syeren@foxmail.com"]
 
   # ✅ SMTP server settings (recommend injecting sensitive info via environment variables)
   smtp_host: "smtp.gmail.com"
@@ -192,6 +192,24 @@ email:
 
   # ✅ Email subject template, can use {run_date}, {paper_count} placeholders
   subject_template: "📑 Weekly LLM4SE Paper Reading - {run_date}"
+
+github:
+  # ✅ Whether to enable GitHub integration (true = commit to GitHub, false = use static site/email)
+  enabled: true
+
+  # ✅ GitHub Personal Access Token (requires 'repo' scope permissions)
+  # Create token at: https://github.com/settings/tokens
+  # Recommend using environment variable: ${GITHUB_TOKEN}
+  token: "${GITHUB_TOKEN}"
+
+  # ✅ Target repository in format: owner/repo (e.g., "username/paper-tracker")
+  repo_name: "iSEngLab/AwesomeLLM4APR"
+
+  # ✅ Target branch to commit to (will be created if doesn't exist)
+  branch: "bot_updates"
+
+  # ✅ File path in repository to update (markdown table format)
+  file_path: "update.md"
 
 runtime:
   # ✅ Run mode:

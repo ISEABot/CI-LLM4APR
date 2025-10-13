@@ -9,7 +9,7 @@ from .pipeline import PipelineOverrides, run_pipeline
 
 
 def build_parser() -> argparse.ArgumentParser:
-	parser = argparse.ArgumentParser(description="LLM4ArxivPaper pipeline")
+	parser = argparse.ArgumentParser(description="CI-LLM4APR pipeline")
 	parser.add_argument("run", nargs="?", help="Execute the pipeline", default="run")
 	parser.add_argument("--config", default="config/pipeline.yaml", help="Path to pipeline YAML config")
 	parser.add_argument("--mode", choices=["online", "offline"], help="Override runtime mode")

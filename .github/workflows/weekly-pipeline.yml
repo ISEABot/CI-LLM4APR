@@ -1,4 +1,4 @@
-name: Weekly LLM4ArxivPaper Pipeline
+name: Weekly CI-LLM4APR Pipeline
 
 on:
   schedule:
@@ -33,7 +33,7 @@ jobs:
       - name: Install dependencies
         run: pip install -r requirements.txt
         
-      - name: Run LLM4ArxivPaper pipeline
+      - name: Run CI-LLM4APR pipeline
         env:
           # Required: GitHub Secrets must be explicitly passed as env vars
           BASE_URL: ${{ secrets.BASE_URL }}

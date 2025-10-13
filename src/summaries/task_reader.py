@@ -57,7 +57,7 @@ class TaskReader:
 
 	def analyse(self, paper: PaperCandidate, interest_prompt: str) -> Tuple[Optional[CoreSummary], List[TaskItem], List[TaskFinding], str, str, str]:
 		"""
-		New workflow:
+		Complete workflow with deep analysis:
 		1. Fetch paper content
 		2. Generate brief summary (Why? What? How?)
 		3. Generate core summary (5 aspects: problem, solution, methodology, experiments, conclusion)

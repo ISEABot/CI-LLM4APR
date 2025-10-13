@@ -21,7 +21,11 @@ class ReportBuilder:
 		findings: List[TaskFinding],
 		overview: str,
 		brief_summary: str = "",
+		venue: str = "arXiv",  # New parameter for publication venue
 	) -> PaperSummary:
+		"""
+		Build comprehensive paper summary with detailed analysis.
+		"""
 		paper = scored_paper.paper
 
 		lines: List[str] = []
@@ -38,6 +42,7 @@ class ReportBuilder:
 		lines.append("**arXiv**: [{id}]({url})".format(id=paper.arxiv_id, url=paper.arxiv_url))
 		lines.append("**Authors**: {authors}".format(authors=", ".join(paper.authors)))
 		lines.append("**Published**: {date}".format(date=paper.published.strftime("%Y-%m-%d")))
+		lines.append("**Venue**: {venue}".format(venue=venue))
 		lines.append("**Score**: {score:.1f}".format(score=self._normalised_score(scored_paper)))
 		lines.append("")
 
@@ -50,7 +55,7 @@ class ReportBuilder:
 
 		# Add core summary (5 aspects) if available
 		if core_summary:
-			lines.append("## � 论文核心内容")
+			lines.append("## 📚 论文核心内容")
 			lines.append("")
 			lines.append("### 1. 主要解决了什么问题？")
 			lines.append(core_summary.problem)
@@ -68,16 +73,18 @@ class ReportBuilder:
 			lines.append(core_summary.conclusion)
 			lines.append("")
 
-		lines.append("## 🤔 用户关心的问题")
-		for idx, task in enumerate(task_list, start=1):
-			lines.append(f"{idx}. **{task.question}** - {task.reason}")
-		lines.append("")
+		if task_list:
+			lines.append("## 🤔 用户关心的问题")
+			for idx, task in enumerate(task_list, start=1):
+				lines.append(f"{idx}. **{task.question}** - {task.reason}")
+			lines.append("")
 
-		lines.append("## 逐项解答")
-		for finding in findings:
-			lines.append(f"### {finding.task.question}")
-			lines.append(finding.answer.strip())
-			lines.append(f"*Confidence: {finding.confidence:.2f}*\n")
+		if findings:
+			lines.append("## 💡 逐项解答")
+			for finding in findings:
+				lines.append(f"### {finding.task.question}")
+				lines.append(finding.answer.strip())
+				lines.append(f"*Confidence: {finding.confidence:.2f}*\n")
 
 		lines.append("## 📝 综合总结")
 		lines.append(overview.strip() or paper.abstract.strip())

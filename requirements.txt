@@ -11,8 +11,8 @@ lxml==4.9.3
 # OpenAI API
 openai>=1.50.0
 
-# GitHub API (using requests for direct API access)
-# PyGithub==1.59.1  # Replaced with direct requests for better control
+# GitHub API
+PyGithub==2.1.1
 
 # Configuration and environment
 python-dotenv==1.0.0
