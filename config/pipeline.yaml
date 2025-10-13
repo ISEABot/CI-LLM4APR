@@ -199,8 +199,9 @@ github:
 
   # ✅ GitHub Personal Access Token (requires 'repo' scope permissions)
   # Create token at: https://github.com/settings/tokens
-  # Recommend using environment variable: ${GITHUB_TOKEN}
-  token: "${GITHUB_TOKEN}"
+  # Recommend using environment variable: ${GH_TOKEN}
+  # ⚠️ IMPORTANT: Do NOT use GITHUB_* prefix (reserved by GitHub Actions)
+  token: "${GH_TOKEN}"
 
   # ✅ Target repository in format: owner/repo (e.g., "username/paper-tracker")
   repo_name: "iSEngLab/AwesomeLLM4APR"

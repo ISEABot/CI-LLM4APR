@@ -54,10 +54,10 @@ topics:
 
 github:
   enabled: true
-  token: "${GITHUB_TOKEN}"
-  repo_name: "username/repository"  # Target repository for paper tracking
-  branch: "updates"  # Branch to commit to (will be created if doesn't exist)
-  file_path: "update.md"  # File to store paper table
+  token: "${GH_TOKEN}"  # Do NOT use GITHUB_* prefix (reserved by GitHub Actions)
+  repo_name: "your_username/your_repo"
+  branch: "updates"
+  file_path: "update.md"
 ```
 
 > 💡 Tip: You can configure multiple topics, and the project will crawl and track papers for each research direction.
@@ -76,7 +76,7 @@ Add the following secrets:
 |-----------------|------------------------------|----------|------------|
 | API_KEY         | OpenAI/LLM API key           | ✅       | [OpenAI API Keys](https://platform.openai.com/api-keys) |
 | BASE_URL        | LLM API endpoint (optional)  | ⚠️       | Leave empty for OpenAI, or use compatible endpoint |
-| GITHUB_TOKEN    | GitHub Personal Access Token | ✅       | [Create token](https://github.com/settings/tokens) with `repo` scope |
+| GH_TOKEN        | GitHub Personal Access Token | ✅       | [Create token](https://github.com/settings/tokens) with `repo` scope. **Note:** Do NOT use `GITHUB_*` prefix (reserved by GitHub Actions) |
 
 > 🔑 **GitHub Token**: Generate a Personal Access Token with `repo` permissions to allow the workflow to commit to your repository.
 

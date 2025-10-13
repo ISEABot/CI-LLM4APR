@@ -81,8 +81,25 @@ def main():
 		print("ℹ️  Running in offline mode - no API key needed.")
 		print("   (You can enable online mode later by setting runtime.mode in config)\n")
 	
+	# GitHub configuration
+	print_header("2️⃣  GitHub Integration Configuration")
+	
+	enable_github = get_yes_no("Do you want to enable GitHub integration?", default=True)
+	
+	if enable_github:
+		print("\n🔗 GitHub configuration:")
+		print("   You'll need a Personal Access Token with 'repo' scope.")
+		print("   Create one at: https://github.com/settings/tokens")
+		print("   ⚠️  IMPORTANT: Use GH_TOKEN (NOT GITHUB_TOKEN - that prefix is reserved)\n")
+		
+		gh_token = get_input("Enter your GitHub Personal Access Token", required=True)
+		config['GH_TOKEN'] = gh_token
+	else:
+		print("ℹ️  GitHub integration disabled.")
+		print("   (You can enable it later by setting github.enabled in config)\n")
+	
 	# Email configuration
-	print_header("2️⃣  Email Notification Configuration")
+	print_header("3️⃣  Email Notification Configuration")
 	
 	enable_email = get_yes_no("Do you want to enable email notifications?", default=False)
 	
@@ -118,7 +135,7 @@ def main():
 	print()
 	
 	# Generate export commands
-	print_header("3️⃣  Next Steps")
+	print_header("4️⃣  Next Steps")
 	
 	if config:
 		print("Copy and run these commands in your terminal:\n")

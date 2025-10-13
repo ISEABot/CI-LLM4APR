@@ -147,10 +147,10 @@ topics:
 
 github:
   enabled: true
-  token: "${GITHUB_TOKEN}"
-  repo_name: "username/repository"  # 目标仓库(用于保存论文追踪表格)
-  branch: "updates"  # 要提交到的分支(如不存在会自动创建)
-  file_path: "update.md"  # 用于存储论文表格的文件
+  token: "${GH_TOKEN}"  # 不要使用 GITHUB_* 前缀（GitHub Actions 保留）
+  repo_name: "your_username/your_repo"
+  branch: "updates"
+  file_path: "update.md"
 ```
 
 > 💡 提示：可以配置多个 topic,项目会分别爬取和追踪每个研究方向的论文。
@@ -169,7 +169,7 @@ github:
 | --------------- | ---------------------------- | ------------ | ------------------------------------------------------------ |
 | API_KEY         | OpenAI/LLM API 密钥          | ✅            | [OpenAI API Keys](https://platform.openai.com/api-keys)     |
 | BASE_URL        | LLM API 端点(可选)           | ⚠️            | OpenAI 留空,或使用兼容端点                                   |
-| GITHUB_TOKEN    | GitHub 个人访问令牌          | ✅            | [创建 Token](https://github.com/settings/tokens) 需要 `repo` 权限 |
+| GH_TOKEN        | GitHub 个人访问令牌          | ✅            | [创建 Token](https://github.com/settings/tokens) 需要 `repo` 权限。**注意：** 不要使用 `GITHUB_*` 前缀（GitHub Actions 保留） |
 
 > 🔑 **GitHub Token**: 生成具有 `repo` 权限的个人访问令牌,以允许工作流提交到你的仓库。
 
