@@ -155,7 +155,7 @@ relevance:
       description: "Whether experiment/evaluation setup sufficiently answers key questions"
 
   # ✅ Pass threshold: total score >= this value considered "relevant", ultimately retained
-  pass_threshold: 60
+  pass_threshold: 20
 
 summarization:
   # ✅ Target number of TODO list items, actual generated count may vary slightly
