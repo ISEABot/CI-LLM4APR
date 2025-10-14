@@ -38,7 +38,7 @@ Edit the `config/pipeline.yaml` file. The minimal core configuration is as follo
 ```yaml
 openai:
   api_key: "${API_KEY}"
-  base_url: "https://<github_username>.github.io/CI-LLM4APR"
+  base_url: "https://ISEABot.github.io/CI-LLM4APR"
   relevance_model: "gpt-4o-mini"
   language: "zh-CN"  # or "en"
 
