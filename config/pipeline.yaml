@@ -24,7 +24,7 @@ openai:
   temperature: 0.2
 
   # ✅ Output language: 'zh-CN' (Simplified Chinese) or 'en' (English)
-  language: "zh-CN"
+  language: "en"
 
 fetch:
   # ✅ Max papers to fetch per Topic, used to control costs
@@ -191,7 +191,7 @@ email:
   timeout: 30
 
   # ✅ Email subject template, can use {run_date}, {paper_count} placeholders
-  subject_template: "📑 Weekly LLM4SE Paper Reading - {run_date}"
+  subject_template: "📑 Weekly LLM4APR Paper Reading - {run_date}"
 
 github:
   # ✅ Whether to enable GitHub integration (true = commit to GitHub, false = use static site/email)
@@ -207,7 +207,7 @@ github:
   repo_name: "iSEngLab/AwesomeLLM4APR"
 
   # ✅ Target branch to commit to (will be created if doesn't exist)
-  branch: "bot_updates"
+  branch: "main"
 
   # ✅ File path in repository to update (markdown table format)
   file_path: "update.md"
