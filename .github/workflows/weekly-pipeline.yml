@@ -2,37 +2,112 @@ name: Weekly CI-LLM4APR Pipeline
 
 on:
   schedule:
-    - cron: '0 4 * * 5'  # Every Friday at 12 AM UTC
+    - cron: '0 4 * * 5'  # Every Friday at 4 AM UTC
   workflow_dispatch:      # Allow manual trigger
 
 jobs:
   build-and-deploy:
     runs-on: ubuntu-latest
-    
+
     # Official GitHub Pages deployment requires these permissions
     permissions:
       contents: read
       pages: write
       id-token: write
-    
+
     # Ensure only one deployment runs at a time
     concurrency:
       group: "pages"
       cancel-in-progress: false
-    
+
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
-        
+
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
           python-version: '3.11'
           cache: 'pip'
-          
+
       - name: Install dependencies
         run: pip install -r requirements.txt
-        
+
+      # Download existing site data from GitHub Pages for incremental updates
+      - name: Download existing site data
+        continue-on-error: true
+        run: |
+          SITE_URL="${{ vars.PAGES_URL }}"
+          if [ -z "$SITE_URL" ]; then
+            SITE_URL="https://${{ github.repository_owner }}.github.io/${{ github.event.repository.name }}"
+          fi
+
+          echo "Downloading existing data from: $SITE_URL"
+
+          mkdir -p site/data
+          mkdir -p site/archives
+          mkdir -p site/topics
+
+          # Download manifest.json
+          echo "Downloading manifest.json..."
+          curl -sSL --fail "$SITE_URL/manifest.json" -o site/manifest.json 2>/dev/null || echo '{"version":"2.0","batches":[],"papers":{}}' > site/manifest.json
+
+          # Download paper data store
+          echo "Downloading papers.json..."
+          curl -sSL --fail "$SITE_URL/data/papers.json" -o site/data/papers.json 2>/dev/null || echo '{"version":"1.0","papers":{}}' > site/data/papers.json
+
+          echo "=== Downloaded existing data ==="
+          ls -la site/
+          ls -la site/data/ 2>/dev/null || true
+
+          # Parse manifest to get archive list and download them
+          if [ -f site/manifest.json ]; then
+            echo "Downloading existing archives..."
+            BATCHES=$(cat site/manifest.json | python3 -c "import sys,json; data=json.load(sys.stdin); print(' '.join(b.get('id','') for b in data.get('batches',[])))" 2>/dev/null || echo "")
+
+            for BATCH in $BATCHES; do
+              if [ -n "$BATCH" ]; then
+                echo "Downloading archive: $BATCH"
+                mkdir -p "site/archives/$BATCH"
+                curl -sSL --fail "$SITE_URL/archives/$BATCH/index.html" -o "site/archives/$BATCH/index.html" 2>/dev/null || true
+                curl -sSL --fail "$SITE_URL/archives/$BATCH/batch.json" -o "site/archives/$BATCH/batch.json" 2>/dev/null || true
+              fi
+            done
+          fi
+
+      # Download existing paper HTML pages
+      - name: Download existing paper pages
+        continue-on-error: true
+        run: |
+          SITE_URL="${{ vars.PAGES_URL }}"
+          if [ -z "$SITE_URL" ]; then
+            SITE_URL="https://${{ github.repository_owner }}.github.io/${{ github.event.repository.name }}"
+          fi
+
+          if [ -f site/manifest.json ]; then
+            echo "Downloading existing paper pages..."
+            # Parse manifest to get paper list
+            cat site/manifest.json | python3 -c "
+          import sys, json
+          data = json.load(sys.stdin)
+          papers = data.get('papers', {})
+          for arxiv_id, info in papers.items():
+              topic = info.get('topic', 'unknown')
+              print(f'{topic}/{arxiv_id}')
+          " 2>/dev/null | while read -r PAPER_PATH; do
+              if [ -n "$PAPER_PATH" ]; then
+                TOPIC=$(echo "$PAPER_PATH" | cut -d'/' -f1)
+                ARXIV_ID=$(echo "$PAPER_PATH" | cut -d'/' -f2)
+
+                mkdir -p "site/topics/$TOPIC"
+                curl -sSL --fail "$SITE_URL/topics/$TOPIC/$ARXIV_ID.html" -o "site/topics/$TOPIC/$ARXIV_ID.html" 2>/dev/null || true
+              fi
+            done
+
+            echo "=== Downloaded paper pages ==="
+            find site/topics -name "*.html" 2>/dev/null | wc -l || echo "0"
+          fi
+
       - name: Run CI-LLM4APR pipeline
         env:
           # Required: GitHub Secrets must be explicitly passed as env vars
@@ -42,12 +117,22 @@ jobs:
           MAIL_USERNAME: ${{ secrets.MAIL_USERNAME }}
           MAIL_PASSWORD: ${{ secrets.MAIL_PASSWORD }}
         run: python src/main.py
-        
+
       - name: Upload Pages artifact
         uses: actions/upload-pages-artifact@v3
         with:
           path: site
-          
+
       - name: Deploy to GitHub Pages
         id: deployment
         uses: actions/deploy-pages@v4
+
+      # Save site data as artifact for backup
+      - name: Upload site data backup
+        uses: actions/upload-artifact@v4
+        with:
+          name: site-data-${{ github.run_number }}
+          path: |
+            site/manifest.json
+            site/data/papers.json
+          retention-days: 365

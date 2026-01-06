@@ -5,20 +5,22 @@ from __future__ import annotations
 import html
 import json
 import os
-import shutil
 from collections import defaultdict
+from datetime import datetime
 from pathlib import Path
-from typing import Dict, Iterable, List, Sequence, Tuple
+from typing import Any, Dict, Iterable, List, Sequence, Tuple
 
 from core.models import PaperSummary, SiteConfig
 
 
 class StaticSiteBuilder:
-    """Build a bilingual static site with an upgraded visual design."""
+    """Build a bilingual static site with incremental update support."""
 
     def __init__(self, site_config: SiteConfig, language: str = "zh-CN"):
         self.site_config = site_config
         self.language = self._normalise_language(language)
+        self._existing_papers: Dict[str, Dict[str, Any]] = {}  # arxiv_id -> paper data
+        self._existing_manifest: Dict[str, Any] = {}
 
     # ------------------------------------------------------------------
     # helpers
@@ -97,40 +99,237 @@ class StaticSiteBuilder:
     # public API
 
     def build(self, summaries: Iterable[PaperSummary]) -> Dict[str, str]:
+        """Incremental build: merge new summaries with existing data."""
         output_dir = Path(self.site_config.output_dir)
-        if output_dir.exists():
-            shutil.rmtree(output_dir)
-        output_dir.mkdir(parents=True, exist_ok=True)
 
+        # Step 1: Load existing data (DO NOT delete the directory!)
+        self._load_existing_data()
+
+        # Step 2: Ensure directory structure exists
+        output_dir.mkdir(parents=True, exist_ok=True)
+        (output_dir / "data").mkdir(exist_ok=True)
+        (output_dir / "archives").mkdir(exist_ok=True)
+        (output_dir / "topics").mkdir(exist_ok=True)
+
+        # Step 3: Process new summaries
+        batch_id = self._get_batch_id()
+        new_papers: List[PaperSummary] = []
         topic_groups: Dict[str, List[PaperSummary]] = defaultdict(list)
+
         for summary in summaries:
+            arxiv_id = summary.paper.arxiv_id
+
+            # Skip if already exists (deduplication)
+            if arxiv_id in self._existing_papers:
+                print(f"[INFO] Paper {arxiv_id} already exists, skipping...")
+                continue
+
+            # Add to new papers
+            new_papers.append(summary)
             topic_groups[summary.topic.name].append(summary)
 
-        index_entries: List[Tuple[str, Sequence[PaperSummary]]] = []
+            # Store paper data
+            paper_data = summary.to_dict()
+            paper_data["batch_id"] = batch_id
+            paper_data["indexed_at"] = datetime.utcnow().isoformat()
+            self._existing_papers[arxiv_id] = paper_data
+
+            # Update manifest paper index
+            self._existing_manifest.setdefault("papers", {})[arxiv_id] = {
+                "topic": summary.topic.name,
+                "batch": batch_id,
+                "title": summary.paper.title,
+                "published": summary.paper.published.strftime("%Y-%m-%d") if summary.paper.published else "",
+                "score": float(self._format_score(summary.score_details)),
+            }
+
+        # Step 4: Generate paper detail pages (only for new papers)
         for topic_name, topic_summaries in topic_groups.items():
             topic_dir = output_dir / "topics" / topic_name
             topic_dir.mkdir(parents=True, exist_ok=True)
+
             for summary in topic_summaries:
                 file_name = f"{summary.paper.arxiv_id}.html"
                 file_path = topic_dir / file_name
                 file_path.write_text(self._render_paper(summary), encoding="utf-8")
-            index_entries.append((topic_name, topic_summaries))
 
-        index_path = output_dir / "index.html"
-        index_path.write_text(self._render_index(index_entries), encoding="utf-8")
+        # Step 5: Update batch information
+        if new_papers:
+            self._update_batch_info(batch_id, new_papers)
+            self._render_batch_archive(output_dir, batch_id, new_papers)
+            print(f"[INFO] Added {len(new_papers)} new papers to batch {batch_id}")
+        else:
+            print("[INFO] No new papers to add")
 
+        # Step 6: Regenerate index pages (with latest batch papers)
+        self._render_main_index(output_dir, batch_id)
+        self._render_archive_index(output_dir)
+
+        # Step 7: Save updated data
+        self._save_manifest(output_dir)
+        self._save_paper_data(output_dir)
+
+        return {"index": str(output_dir / "index.html")}
+
+    # ------------------------------------------------------------------
+    # data persistence layer
+
+    def _load_existing_data(self) -> None:
+        """Load existing manifest and paper data from site directory."""
+        output_dir = Path(self.site_config.output_dir)
+
+        # Load manifest
         manifest_path = output_dir / "manifest.json"
-        manifest = {
-            "base_url": self.site_config.base_url,
-            "generated": os.environ.get("PIPELINE_RUN_AT"),
-            "topics": {
-                topic: [summary.paper.arxiv_id for summary in items]
-                for topic, items in topic_groups.items()
-            },
-        }
-        manifest_path.write_text(json.dumps(manifest, indent=2, ensure_ascii=False), encoding="utf-8")
+        if manifest_path.exists():
+            try:
+                with open(manifest_path, "r", encoding="utf-8") as f:
+                    self._existing_manifest = json.load(f)
+            except (json.JSONDecodeError, IOError):
+                self._existing_manifest = self._create_empty_manifest()
+        else:
+            self._existing_manifest = self._create_empty_manifest()
 
-        return {"index": str(index_path)}
+        # Load paper data store
+        papers_path = output_dir / "data" / "papers.json"
+        if papers_path.exists():
+            try:
+                with open(papers_path, "r", encoding="utf-8") as f:
+                    data = json.load(f)
+                    self._existing_papers = data.get("papers", {})
+            except (json.JSONDecodeError, IOError):
+                self._existing_papers = {}
+        else:
+            self._existing_papers = {}
+
+    def _create_empty_manifest(self) -> Dict[str, Any]:
+        """Create empty manifest structure."""
+        return {
+            "version": "2.0",
+            "base_url": self.site_config.base_url,
+            "last_updated": None,
+            "statistics": {
+                "total_papers": 0,
+                "total_batches": 0,
+            },
+            "batches": [],
+            "papers": {},
+        }
+
+    def _get_batch_id(self) -> str:
+        """Generate batch ID based on current ISO week."""
+        now = datetime.utcnow()
+        year, week, _ = now.isocalendar()
+        return f"{year}-W{week:02d}"
+
+    def _update_batch_info(self, batch_id: str, papers: List[PaperSummary]) -> None:
+        """Update manifest with new batch information."""
+        topics = list(set(p.topic.name for p in papers))
+
+        # Check if batch already exists
+        existing_batch = next(
+            (b for b in self._existing_manifest.get("batches", []) if b["id"] == batch_id),
+            None
+        )
+
+        if existing_batch:
+            existing_batch["paper_count"] += len(papers)
+            existing_batch["topics"] = list(set(existing_batch.get("topics", [])) | set(topics))
+        else:
+            self._existing_manifest.setdefault("batches", []).insert(0, {
+                "id": batch_id,
+                "generated": datetime.utcnow().isoformat(),
+                "paper_count": len(papers),
+                "topics": topics,
+            })
+
+        # Update statistics
+        stats = self._existing_manifest.setdefault("statistics", {})
+        stats["total_papers"] = len(self._existing_papers)
+        stats["total_batches"] = len(self._existing_manifest.get("batches", []))
+
+        self._existing_manifest["last_updated"] = datetime.utcnow().isoformat()
+
+    def _save_manifest(self, output_dir: Path) -> None:
+        """Save manifest.json."""
+        manifest_path = output_dir / "manifest.json"
+
+        # Also include legacy fields for backward compatibility
+        self._existing_manifest["base_url"] = self.site_config.base_url
+        self._existing_manifest["generated"] = os.environ.get("PIPELINE_RUN_AT") or datetime.utcnow().isoformat()
+
+        # Build topics mapping for legacy compatibility
+        topics_mapping: Dict[str, List[str]] = defaultdict(list)
+        for arxiv_id, info in self._existing_manifest.get("papers", {}).items():
+            topics_mapping[info.get("topic", "unknown")].append(arxiv_id)
+        self._existing_manifest["topics"] = dict(topics_mapping)
+
+        manifest_path.write_text(
+            json.dumps(self._existing_manifest, indent=2, ensure_ascii=False),
+            encoding="utf-8"
+        )
+
+    def _save_paper_data(self, output_dir: Path) -> None:
+        """Save paper data store."""
+        data_dir = output_dir / "data"
+        data_dir.mkdir(parents=True, exist_ok=True)
+
+        papers_path = data_dir / "papers.json"
+        papers_path.write_text(
+            json.dumps({"version": "1.0", "papers": self._existing_papers}, indent=2, ensure_ascii=False),
+            encoding="utf-8"
+        )
+
+    def _render_batch_archive(self, output_dir: Path, batch_id: str, papers: List[PaperSummary]) -> None:
+        """Render archive page for a specific batch."""
+        batch_dir = output_dir / "archives" / batch_id
+        batch_dir.mkdir(parents=True, exist_ok=True)
+
+        # Save batch metadata
+        batch_meta = {
+            "id": batch_id,
+            "generated": datetime.utcnow().isoformat(),
+            "papers": [p.paper.arxiv_id for p in papers],
+        }
+        (batch_dir / "batch.json").write_text(
+            json.dumps(batch_meta, indent=2, ensure_ascii=False),
+            encoding="utf-8"
+        )
+
+        # Render batch index HTML
+        batch_html = self._render_batch_index_html(batch_id, papers)
+        (batch_dir / "index.html").write_text(batch_html, encoding="utf-8")
+
+    def _render_main_index(self, output_dir: Path, current_batch_id: str) -> None:
+        """Render main index page showing latest batch papers and archive link."""
+        # Get papers from the current batch
+        current_batch_papers: List[Dict[str, Any]] = []
+        for arxiv_id, paper_data in self._existing_papers.items():
+            if paper_data.get("batch_id") == current_batch_id:
+                current_batch_papers.append(paper_data)
+
+        # Group by topic
+        topic_groups: Dict[str, List[Dict[str, Any]]] = defaultdict(list)
+        for paper_data in current_batch_papers:
+            topic_name = paper_data.get("topic", {}).get("name", "Unknown")
+            topic_groups[topic_name].append(paper_data)
+
+        index_entries = [(name, papers) for name, papers in topic_groups.items()]
+
+        # Calculate total stats
+        total_papers = self._existing_manifest.get("statistics", {}).get("total_papers", len(self._existing_papers))
+        total_batches = len(self._existing_manifest.get("batches", []))
+
+        index_html = self._render_index_with_archives(index_entries, total_papers, total_batches, current_batch_id)
+        (output_dir / "index.html").write_text(index_html, encoding="utf-8")
+
+    def _render_archive_index(self, output_dir: Path) -> None:
+        """Render archive listing page."""
+        archives_dir = output_dir / "archives"
+        archives_dir.mkdir(exist_ok=True)
+
+        batches = self._existing_manifest.get("batches", [])
+        archive_html = self._render_archive_listing_html(batches)
+        (archives_dir / "index.html").write_text(archive_html, encoding="utf-8")
 
     # ------------------------------------------------------------------
     # rendering helpers
@@ -634,6 +833,383 @@ body {
         html_parts.append("</body>")
         html_parts.append("</html>")
         return "\n".join(html_parts)
+
+    def _render_index_with_archives(
+        self,
+        index_entries: List[Tuple[str, List[Dict[str, Any]]]],
+        total_papers: int,
+        total_batches: int,
+        current_batch_id: str,
+    ) -> str:
+        """Render main index page with archive link (uses paper data dicts)."""
+        html_lang = self._html_lang(self.language)
+        update_time = datetime.utcnow().strftime("%Y-%m-%d")
+        batch_paper_count = sum(len(items) for _, items in index_entries)
+        total_topics = len(index_entries)
+
+        style_block = self._get_index_style()
+
+        # Build sidebar navigation
+        sidebar_nav = []
+        for topic_name, topic_papers in index_entries:
+            topic_label = topic_papers[0].get("topic", {}).get("label", topic_name) if topic_papers else topic_name
+            sidebar_nav.append(f"<li><a href='#{topic_name}'>{self._escape(topic_label)}</a></li>")
+
+        html_parts = [
+            "<!DOCTYPE html>",
+            f"<html lang='{html_lang}'>",
+            "<head>",
+            "  <meta charset='utf-8'>",
+            "  <meta name='viewport' content='width=device-width, initial-scale=1'>",
+            f"  <title>{self._escape('CI-LLM4APR')}</title>",
+            f"  <style>{style_block}</style>",
+            "</head>",
+            f"<body data-lang='{self.language}'>",
+            "  <div class='page'>",
+            # Sidebar with stats
+            "    <aside class='sidebar'>",
+            "      <div class='sidebar-header'>",
+            f"        <h1>{self._i18n('CI-LLM4APR', 'CI-LLM4APR')}</h1>",
+            "      </div>",
+            # Stats in sidebar
+            "      <div class='sidebar-stats'>",
+            f"        <h3>{self._i18n('统计信息', 'Statistics')}</h3>",
+            "        <div class='sidebar-stat-item'>",
+            "          <span class='sidebar-stat-icon'>📄</span>",
+            f"          <span class='sidebar-stat-label'>{self._i18n('总论文数', 'Total Papers')}</span>",
+            f"          <span class='sidebar-stat-value'>{total_papers}</span>",
+            "        </div>",
+            "        <div class='sidebar-stat-item'>",
+            "          <span class='sidebar-stat-icon'>📦</span>",
+            f"          <span class='sidebar-stat-label'>{self._i18n('历史批次', 'Batches')}</span>",
+            f"          <span class='sidebar-stat-value'>{total_batches}</span>",
+            "        </div>",
+            "        <div class='sidebar-stat-item'>",
+            "          <span class='sidebar-stat-icon'>🕒</span>",
+            f"          <span class='sidebar-stat-label'>{self._i18n('更新', 'Updated')}</span>",
+            f"          <span class='sidebar-stat-value'>{update_time}</span>",
+            "        </div>",
+            "      </div>",
+            # Topics navigation
+            "      <nav class='sidebar-nav'>",
+            f"        <h3>{self._i18n('专题导航', 'Topics')}</h3>",
+            "        <ul>",
+            "\n".join(f"          {item}" for item in sidebar_nav),
+            "        </ul>",
+            "      </nav>",
+            # Archive link
+            "      <div class='sidebar-archive-link'>",
+            f"        <a href='archives/'>{self._i18n('📚 查看历史归档', '📚 View Archives')}</a>",
+            "      </div>",
+            "    </aside>",
+            # Main content
+            "    <div class='main-content'>",
+            "      <header class='top-bar'>",
+            "        <div class='top-bar-title'>",
+            f"          <h1>{self._i18n('每周精选科技论文', 'Weekly Research Highlights')}</h1>",
+            f"          <p>{self._i18n(f'本周批次: {current_batch_id} ({batch_paper_count} 篇)', f'Current Batch: {current_batch_id} ({batch_paper_count} papers)')}</p>",
+            "        </div>",
+            f"        {self._lang_toggle_button()}",
+            "      </header>",
+            "      <main class='container'>",
+        ]
+
+        if not index_entries or batch_paper_count == 0:
+            html_parts.append(
+                f"        <p>{self._i18n('本周暂无新论文。', 'No new papers this week.')}</p>"
+            )
+            html_parts.append(
+                f"        <p><a href='archives/'>{self._i18n('查看历史归档', 'View archives')}</a></p>"
+            )
+        else:
+            for topic_name, topic_papers in index_entries:
+                topic_label = topic_papers[0].get("topic", {}).get("label", topic_name) if topic_papers else topic_name
+                count = len(topic_papers)
+                html_parts.append(f"        <section class='topic-section' id='{topic_name}'>")
+                html_parts.append("          <div class='topic-header'>")
+                html_parts.append(f"            <h2 class='topic-title'>{self._escape(topic_label)}</h2>")
+                html_parts.append(f"            <span class='topic-count'>{count} {self._i18n('篇', 'papers')}</span>")
+                html_parts.append("          </div>")
+                html_parts.append("          <ul class='paper-list'>")
+
+                for paper_data in topic_papers:
+                    paper_info = paper_data.get("paper", {})
+                    arxiv_id = paper_info.get("arxiv_id", "unknown")
+                    title = self._escape(paper_info.get("title", "Untitled"))
+                    score_details = paper_data.get("score_details", {})
+                    score = score_details.get("total_score", 0)
+
+                    relative_path = f"topics/{topic_name}/{arxiv_id}.html"
+                    url = relative_path
+
+                    # Build meta info
+                    authors = paper_info.get("authors", [])
+                    author_text = ""
+                    if authors:
+                        author_preview = ", ".join(authors[:3])
+                        if len(authors) > 3:
+                            author_preview += ", ..."
+                        author_text = self._escape(author_preview)
+
+                    html_parts.append("            <li class='paper-item'>")
+                    html_parts.append(f"              <a href='{self._escape(url)}'>{title}</a>")
+                    html_parts.append("              <div class='paper-meta'>")
+                    html_parts.append(f"                <span class='paper-meta-item'>📊 {self._i18n('相关度', 'Score')}: {score:.1f}</span>")
+                    if author_text:
+                        html_parts.append(f"                <span class='paper-meta-item'>👤 {author_text}</span>")
+                    pub_date = paper_info.get("published", "")
+                    if pub_date:
+                        html_parts.append(f"                <span class='paper-meta-item'>📅 {pub_date[:10]}</span>")
+                    html_parts.append("              </div>")
+                    html_parts.append("            </li>")
+
+                html_parts.append("          </ul>")
+                html_parts.append("        </section>")
+
+        html_parts.append("      </main>")
+        html_parts.append(
+            f"      <footer class='site-footer'>{self._i18n('由 CI-LLM4APR 自动生成', 'Generated by the CI-LLM4APR pipeline')}</footer>"
+        )
+        html_parts.append("    </div>")
+        html_parts.append("  </div>")
+        html_parts.append(self._language_script())
+        html_parts.append("</body>")
+        html_parts.append("</html>")
+        return "\n".join(html_parts)
+
+    def _render_batch_index_html(self, batch_id: str, papers: List[PaperSummary]) -> str:
+        """Render archive page for a specific batch."""
+        html_lang = self._html_lang(self.language)
+        style_block = self._get_index_style()
+
+        # Group by topic
+        topic_groups: Dict[str, List[PaperSummary]] = defaultdict(list)
+        for paper in papers:
+            topic_groups[paper.topic.name].append(paper)
+
+        html_parts = [
+            "<!DOCTYPE html>",
+            f"<html lang='{html_lang}'>",
+            "<head>",
+            "  <meta charset='utf-8'>",
+            "  <meta name='viewport' content='width=device-width, initial-scale=1'>",
+            f"  <title>{self._escape(f'Archive - {batch_id}')}</title>",
+            f"  <style>{style_block}</style>",
+            "</head>",
+            f"<body data-lang='{self.language}'>",
+            "  <div class='page'>",
+            "    <aside class='sidebar'>",
+            "      <div class='sidebar-header'>",
+            f"        <a href='../../' style='text-decoration:none;color:inherit;'><h1>{self._i18n('🏠 首页', '🏠 Home')}</h1></a>",
+            "      </div>",
+            "      <div class='sidebar-stats'>",
+            f"        <h3>{self._i18n('批次信息', 'Batch Info')}</h3>",
+            "        <div class='sidebar-stat-item'>",
+            f"          <span class='sidebar-stat-label'>{self._i18n('批次', 'Batch')}</span>",
+            f"          <span class='sidebar-stat-value'>{batch_id}</span>",
+            "        </div>",
+            "        <div class='sidebar-stat-item'>",
+            f"          <span class='sidebar-stat-label'>{self._i18n('论文数', 'Papers')}</span>",
+            f"          <span class='sidebar-stat-value'>{len(papers)}</span>",
+            "        </div>",
+            "      </div>",
+            "      <div class='sidebar-archive-link'>",
+            f"        <a href='../'>{self._i18n('📚 返回归档列表', '📚 Back to Archives')}</a>",
+            "      </div>",
+            "    </aside>",
+            "    <div class='main-content'>",
+            "      <header class='top-bar'>",
+            "        <div class='top-bar-title'>",
+            f"          <h1>{self._i18n(f'归档: {batch_id}', f'Archive: {batch_id}')}</h1>",
+            f"          <p>{self._i18n(f'共 {len(papers)} 篇论文', f'{len(papers)} papers in this batch')}</p>",
+            "        </div>",
+            f"        {self._lang_toggle_button()}",
+            "      </header>",
+            "      <main class='container'>",
+        ]
+
+        for topic_name, topic_papers in topic_groups.items():
+            topic_label = topic_papers[0].topic.label if topic_papers else topic_name
+            count = len(topic_papers)
+            html_parts.append(f"        <section class='topic-section' id='{topic_name}'>")
+            html_parts.append("          <div class='topic-header'>")
+            html_parts.append(f"            <h2 class='topic-title'>{self._escape(topic_label)}</h2>")
+            html_parts.append(f"            <span class='topic-count'>{count} {self._i18n('篇', 'papers')}</span>")
+            html_parts.append("          </div>")
+            html_parts.append("          <ul class='paper-list'>")
+
+            for summary in topic_papers:
+                url = f"../../topics/{topic_name}/{summary.paper.arxiv_id}.html"
+                title = self._escape(summary.paper.title)
+                score = self._format_score(summary.score_details)
+
+                author_text = ""
+                if summary.paper.authors:
+                    author_preview = ", ".join(summary.paper.authors[:3])
+                    if len(summary.paper.authors) > 3:
+                        author_preview += ", ..."
+                    author_text = self._escape(author_preview)
+
+                html_parts.append("            <li class='paper-item'>")
+                html_parts.append(f"              <a href='{self._escape(url)}'>{title}</a>")
+                html_parts.append("              <div class='paper-meta'>")
+                html_parts.append(f"                <span class='paper-meta-item'>📊 {self._i18n('相关度', 'Score')}: {score}</span>")
+                if author_text:
+                    html_parts.append(f"                <span class='paper-meta-item'>👤 {author_text}</span>")
+                if summary.paper.published:
+                    pub_date = summary.paper.published.strftime("%Y-%m-%d")
+                    html_parts.append(f"                <span class='paper-meta-item'>📅 {pub_date}</span>")
+                html_parts.append("              </div>")
+                html_parts.append("            </li>")
+
+            html_parts.append("          </ul>")
+            html_parts.append("        </section>")
+
+        html_parts.append("      </main>")
+        html_parts.append(
+            f"      <footer class='site-footer'>{self._i18n('由 CI-LLM4APR 自动生成', 'Generated by the CI-LLM4APR pipeline')}</footer>"
+        )
+        html_parts.append("    </div>")
+        html_parts.append("  </div>")
+        html_parts.append(self._language_script())
+        html_parts.append("</body>")
+        html_parts.append("</html>")
+        return "\n".join(html_parts)
+
+    def _render_archive_listing_html(self, batches: List[Dict[str, Any]]) -> str:
+        """Render archive listing page showing all historical batches."""
+        html_lang = self._html_lang(self.language)
+        style_block = self._get_index_style()
+
+        html_parts = [
+            "<!DOCTYPE html>",
+            f"<html lang='{html_lang}'>",
+            "<head>",
+            "  <meta charset='utf-8'>",
+            "  <meta name='viewport' content='width=device-width, initial-scale=1'>",
+            f"  <title>{self._escape('Archives - CI-LLM4APR')}</title>",
+            f"  <style>{style_block}</style>",
+            "</head>",
+            f"<body data-lang='{self.language}'>",
+            "  <div class='page'>",
+            "    <aside class='sidebar'>",
+            "      <div class='sidebar-header'>",
+            f"        <a href='../' style='text-decoration:none;color:inherit;'><h1>{self._i18n('🏠 首页', '🏠 Home')}</h1></a>",
+            "      </div>",
+            "      <div class='sidebar-stats'>",
+            f"        <h3>{self._i18n('归档统计', 'Archive Stats')}</h3>",
+            "        <div class='sidebar-stat-item'>",
+            f"          <span class='sidebar-stat-label'>{self._i18n('总批次', 'Total Batches')}</span>",
+            f"          <span class='sidebar-stat-value'>{len(batches)}</span>",
+            "        </div>",
+            "      </div>",
+            "    </aside>",
+            "    <div class='main-content'>",
+            "      <header class='top-bar'>",
+            "        <div class='top-bar-title'>",
+            f"          <h1>{self._i18n('📚 历史归档', '📚 Archives')}</h1>",
+            f"          <p>{self._i18n('按周浏览历史论文', 'Browse papers by week')}</p>",
+            "        </div>",
+            f"        {self._lang_toggle_button()}",
+            "      </header>",
+            "      <main class='container'>",
+        ]
+
+        if not batches:
+            html_parts.append(
+                f"        <p>{self._i18n('暂无历史归档。', 'No archives yet.')}</p>"
+            )
+        else:
+            html_parts.append("        <ul class='paper-list'>")
+            for batch in batches:
+                batch_id = batch.get("id", "unknown")
+                paper_count = batch.get("paper_count", 0)
+                generated = batch.get("generated", "")[:10]
+                topics = batch.get("topics", [])
+                topics_str = ", ".join(topics) if topics else "N/A"
+
+                html_parts.append("          <li class='paper-item'>")
+                html_parts.append(f"            <a href='{batch_id}/'>{self._i18n(f'批次 {batch_id}', f'Batch {batch_id}')}</a>")
+                html_parts.append("            <div class='paper-meta'>")
+                html_parts.append(f"              <span class='paper-meta-item'>📄 {paper_count} {self._i18n('篇论文', 'papers')}</span>")
+                html_parts.append(f"              <span class='paper-meta-item'>📅 {generated}</span>")
+                html_parts.append(f"              <span class='paper-meta-item'>🏷️ {self._escape(topics_str)}</span>")
+                html_parts.append("            </div>")
+                html_parts.append("          </li>")
+            html_parts.append("        </ul>")
+
+        html_parts.append("      </main>")
+        html_parts.append(
+            f"      <footer class='site-footer'>{self._i18n('由 CI-LLM4APR 自动生成', 'Generated by the CI-LLM4APR pipeline')}</footer>"
+        )
+        html_parts.append("    </div>")
+        html_parts.append("  </div>")
+        html_parts.append(self._language_script())
+        html_parts.append("</body>")
+        html_parts.append("</html>")
+        return "\n".join(html_parts)
+
+    def _get_index_style(self) -> str:
+        """Return shared CSS styles for index pages."""
+        return """
+:root {
+  --page-max-width: 1200px;
+  --sidebar-width: 240px;
+  --bg-color: #f8f9fa;
+  --card-bg: #ffffff;
+  --border-color: #e5e7eb;
+  --accent: #2563eb;
+  --accent-light: #eff6ff;
+  --text-primary: #111827;
+  --text-secondary: #6b7280;
+  --text-muted: #9ca3af;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Helvetica', 'Arial', sans-serif;
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { margin: 0; min-height: 100vh; background: var(--bg-color); color: var(--text-primary); line-height: 1.6; }
+.page { min-height: 100vh; display: flex; }
+.sidebar { width: var(--sidebar-width); background: var(--card-bg); border-right: 1px solid var(--border-color); position: fixed; left: 0; top: 0; bottom: 0; overflow-y: auto; z-index: 100; }
+.sidebar-header { padding: 1.5rem 1.25rem; border-bottom: 1px solid var(--border-color); }
+.sidebar-header h1 { font-size: 1.25rem; font-weight: 700; color: var(--text-primary); }
+.sidebar-stats { padding: 1rem 1.25rem; border-bottom: 1px solid var(--border-color); }
+.sidebar-stats h3 { font-size: 0.75rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; color: var(--text-muted); margin-bottom: 0.75rem; }
+.sidebar-stat-item { display: flex; align-items: center; gap: 0.5rem; padding: 0.5rem 0; font-size: 0.875rem; }
+.sidebar-stat-icon { font-size: 1rem; }
+.sidebar-stat-label { color: var(--text-secondary); flex: 1; }
+.sidebar-stat-value { font-weight: 600; color: var(--accent); }
+.sidebar-nav { padding: 1rem 0; }
+.sidebar-nav h3 { font-size: 0.75rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; color: var(--text-muted); padding: 0 1.25rem 0.5rem; }
+.sidebar-nav ul { list-style: none; }
+.sidebar-nav li { margin: 0.25rem 0; }
+.sidebar-nav a { display: block; padding: 0.5rem 1.25rem; color: var(--text-secondary); text-decoration: none; font-size: 0.875rem; transition: all 0.2s; }
+.sidebar-nav a:hover { background: var(--accent-light); color: var(--accent); }
+.sidebar-archive-link { padding: 1rem 1.25rem; border-top: 1px solid var(--border-color); }
+.sidebar-archive-link a { display: block; padding: 0.75rem 1rem; background: var(--accent-light); color: var(--accent); text-decoration: none; font-size: 0.875rem; font-weight: 600; border-radius: 6px; text-align: center; transition: all 0.2s; }
+.sidebar-archive-link a:hover { background: var(--accent); color: white; }
+.main-content { margin-left: var(--sidebar-width); flex: 1; display: flex; flex-direction: column; }
+.top-bar { background: var(--card-bg); border-bottom: 1px solid var(--border-color); padding: 1.25rem 2rem; display: flex; justify-content: space-between; align-items: center; position: sticky; top: 0; z-index: 50; }
+.top-bar-title { flex: 1; }
+.top-bar-title h1 { font-size: 1.75rem; font-weight: 700; margin-bottom: 0.25rem; color: var(--text-primary); }
+.top-bar-title p { font-size: 0.95rem; color: var(--text-secondary); margin: 0; }
+.lang-toggle { border: 1px solid var(--border-color); background: var(--card-bg); color: var(--text-primary); border-radius: 6px; padding: 0.5rem 1rem; font-size: 0.875rem; font-weight: 500; cursor: pointer; transition: all 0.2s; flex-shrink: 0; }
+.lang-toggle:hover { background: var(--accent-light); border-color: var(--accent); color: var(--accent); }
+.container { flex: 1; padding: 1rem 1.5rem; max-width: var(--page-max-width); margin: 0 auto; width: 100%; }
+.topic-section { margin-bottom: 2rem; scroll-margin-top: 4rem; }
+.topic-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 1rem; padding-bottom: 0.75rem; border-bottom: 2px solid var(--border-color); }
+.topic-title { font-size: 1.5rem; font-weight: 700; color: var(--text-primary); }
+.topic-count { font-size: 0.875rem; color: var(--text-muted); background: var(--bg-color); padding: 0.25rem 0.75rem; border-radius: 12px; }
+.paper-list { list-style: none; background: var(--card-bg); border: 1px solid var(--border-color); border-radius: 8px; overflow: hidden; }
+.paper-item { padding: 0.875rem 1.25rem; border-bottom: 1px solid var(--border-color); transition: background 0.2s; }
+.paper-item:last-child { border-bottom: none; }
+.paper-item:hover { background: var(--accent-light); }
+.paper-item a { text-decoration: none; color: var(--text-primary); font-weight: 600; font-size: 1.05rem; line-height: 1.5; transition: color 0.2s; }
+.paper-item a:hover { color: var(--accent); }
+.paper-meta { display: flex; gap: 1.5rem; margin-top: 0.5rem; font-size: 0.875rem; color: var(--text-secondary); flex-wrap: wrap; }
+.paper-meta-item { display: flex; align-items: center; gap: 0.375rem; }
+.site-footer { text-align: center; padding: 2rem; color: var(--text-muted); font-size: 0.875rem; background: var(--card-bg); border-top: 1px solid var(--border-color); }
+@media (max-width: 1024px) { .sidebar { transform: translateX(-100%); transition: transform 0.3s; } .main-content { margin-left: 0; } }
+@media (max-width: 768px) { .top-bar { padding: 1rem; flex-direction: column; align-items: flex-start; gap: 1rem; } .container { padding: 1rem; } .paper-meta { flex-direction: column; gap: 0.25rem; } }
+""".strip()
 
     def _render_paper(self, summary: PaperSummary) -> str:
         html_lang = self._html_lang(self.language)

@@ -226,12 +226,56 @@ class PaperCandidate:
 	affiliations: List[str] = field(default_factory=list)
 	comment: Optional[str] = None
 
+	def to_dict(self) -> Dict[str, Any]:
+		return {
+			"topic_name": self.topic.name,
+			"arxiv_id": self.arxiv_id,
+			"title": self.title,
+			"abstract": self.abstract,
+			"authors": self.authors,
+			"categories": self.categories,
+			"published": self.published.isoformat() if self.published else None,
+			"updated": self.updated.isoformat() if self.updated else None,
+			"arxiv_url": self.arxiv_url,
+			"pdf_url": self.pdf_url,
+			"affiliations": self.affiliations,
+			"comment": self.comment,
+		}
+
+	@staticmethod
+	def from_dict(data: Dict[str, Any], topic: TopicConfig) -> "PaperCandidate":
+		return PaperCandidate(
+			topic=topic,
+			arxiv_id=data["arxiv_id"],
+			title=data["title"],
+			abstract=data.get("abstract", ""),
+			authors=data.get("authors", []),
+			categories=data.get("categories", []),
+			published=datetime.fromisoformat(data["published"]) if data.get("published") else datetime.utcnow(),
+			updated=datetime.fromisoformat(data["updated"]) if data.get("updated") else datetime.utcnow(),
+			arxiv_url=data.get("arxiv_url", ""),
+			pdf_url=data.get("pdf_url"),
+			affiliations=data.get("affiliations", []),
+			comment=data.get("comment"),
+		)
+
 
 @dataclass
 class DimensionScore:
 	name: str
 	weight: float
 	value: float
+
+	def to_dict(self) -> Dict[str, Any]:
+		return {"name": self.name, "weight": self.weight, "value": self.value}
+
+	@staticmethod
+	def from_dict(data: Dict[str, Any]) -> "DimensionScore":
+		return DimensionScore(
+			name=data["name"],
+			weight=float(data["weight"]),
+			value=float(data["value"]),
+		)
 
 
 @dataclass
@@ -245,8 +289,17 @@ class ScoredPaper:
 			"arxiv_id": self.paper.arxiv_id,
 			"title": self.paper.title,
 			"total_score": self.total_score,
-			"scores": [score.__dict__ for score in self.scores],
+			"scores": [score.to_dict() for score in self.scores],
 		}
+
+	@staticmethod
+	def from_dict(data: Dict[str, Any], paper: PaperCandidate) -> "ScoredPaper":
+		scores = [DimensionScore.from_dict(s) for s in data.get("scores", [])]
+		return ScoredPaper(
+			paper=paper,
+			scores=scores,
+			total_score=float(data.get("total_score", 0.0)),
+		)
 
 
 @dataclass
@@ -254,12 +307,34 @@ class TaskItem:
 	question: str
 	reason: str
 
+	def to_dict(self) -> Dict[str, Any]:
+		return {"question": self.question, "reason": self.reason}
+
+	@staticmethod
+	def from_dict(data: Dict[str, Any]) -> "TaskItem":
+		return TaskItem(question=data["question"], reason=data["reason"])
+
 
 @dataclass
 class TaskFinding:
 	task: TaskItem
 	answer: str
 	confidence: float
+
+	def to_dict(self) -> Dict[str, Any]:
+		return {
+			"task": self.task.to_dict(),
+			"answer": self.answer,
+			"confidence": self.confidence,
+		}
+
+	@staticmethod
+	def from_dict(data: Dict[str, Any]) -> "TaskFinding":
+		return TaskFinding(
+			task=TaskItem.from_dict(data["task"]),
+			answer=data["answer"],
+			confidence=float(data["confidence"]),
+		)
 
 
 @dataclass
@@ -270,6 +345,25 @@ class CoreSummary:
 	methodology: str  # Core methodology/steps/strategy
 	experiments: str  # Experimental design, Metrics, baseline, dataset
 	conclusion: str  # Conclusion
+
+	def to_dict(self) -> Dict[str, Any]:
+		return {
+			"problem": self.problem,
+			"solution": self.solution,
+			"methodology": self.methodology,
+			"experiments": self.experiments,
+			"conclusion": self.conclusion,
+		}
+
+	@staticmethod
+	def from_dict(data: Dict[str, Any]) -> "CoreSummary":
+		return CoreSummary(
+			problem=data.get("problem", ""),
+			solution=data.get("solution", ""),
+			methodology=data.get("methodology", ""),
+			experiments=data.get("experiments", ""),
+			conclusion=data.get("conclusion", ""),
+		)
 
 
 @dataclass
@@ -283,6 +377,44 @@ class PaperSummary:
 	score_details: ScoredPaper
 	markdown: str
 	brief_summary: str = ""  # 1-2 paragraph narrative summary (Why? What? How?)
+
+	def to_dict(self) -> Dict[str, Any]:
+		"""Serialize PaperSummary to dictionary for JSON storage."""
+		return {
+			"paper": self.paper.to_dict(),
+			"topic": {"name": self.topic.name, "label": self.topic.label},
+			"core_summary": self.core_summary.to_dict() if self.core_summary else None,
+			"task_list": [task.to_dict() for task in self.task_list],
+			"findings": [finding.to_dict() for finding in self.findings],
+			"overview": self.overview,
+			"brief_summary": self.brief_summary,
+			"score_details": self.score_details.to_dict(),
+		}
+
+	@staticmethod
+	def from_dict(data: Dict[str, Any], topic_config: TopicConfig) -> "PaperSummary":
+		"""Deserialize PaperSummary from dictionary."""
+		paper = PaperCandidate.from_dict(data["paper"], topic_config)
+
+		core_summary = None
+		if data.get("core_summary"):
+			core_summary = CoreSummary.from_dict(data["core_summary"])
+
+		task_list = [TaskItem.from_dict(t) for t in data.get("task_list", [])]
+		findings = [TaskFinding.from_dict(f) for f in data.get("findings", [])]
+		score_details = ScoredPaper.from_dict(data.get("score_details", {}), paper)
+
+		return PaperSummary(
+			paper=paper,
+			topic=topic_config,
+			core_summary=core_summary,
+			task_list=task_list,
+			findings=findings,
+			overview=data.get("overview", ""),
+			score_details=score_details,
+			markdown="",  # Regenerate when needed
+			brief_summary=data.get("brief_summary", ""),
+		)
 
 
 @dataclass
