@@ -31,7 +31,7 @@ fetch:
   max_papers_per_topic: 50
 
   # ✅ Query lookback days: e.g., 7 means fetch papers published within last 7 days
-  days_back: 60
+  days_back: 7
 
   # ✅ arXiv API request interval (seconds), avoid rate limiting
   request_delay: 3.0
